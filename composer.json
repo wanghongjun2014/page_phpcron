@@ -1,0 +1,19 @@
+{
+    "config": {
+        "secure-http": false
+    },
+    "name": "wanghongjun/phpcron",
+    "description": "page cron dispatch system",
+    "type": "project",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "王洪军",
+            "email": "hongjun6@staff.weibo.com"
+        }
+    ],
+    "autoload": {
+        "psr-0": {"Phpcron\\": "src/"}
+    }
+
+}
