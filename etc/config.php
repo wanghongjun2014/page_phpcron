@@ -4,11 +4,11 @@ return array(
     // db配置
     'db' => array(
         'engine' => 'mysql',
-        'host' => '10.210.238.239',
+        'host' => 'rm-2zey9z5087ifc26hlo.mysql.rds.aliyuncs.com',
         'port' => 3306,
-        'username' => 'pageadmin',
-        'password' => 'weibo123',
-        'database' => 'cron_monitor',
+        'username' => 'wanghongjun',
+        'password' => 'Wanghongjun2017',
+        'database' => 'wealth-market',
         'options' => array()
     ),
 
