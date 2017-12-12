@@ -203,8 +203,11 @@ class Phpcron
             $start_time = Utils::get_milli_second();
             $ppid = $this->_get_master_pid();
             $over_time = !empty($cron['timeout']) ? $start_time + $cron['timeout'] * 1000 : 0;
+
+            // 记录process表
             $insert_ret = $this->pdo->insert('process', array(
                 'cron_id' => $cron['id'],
+                'server_id' => $cron['server_id'],
                 'pid' => $process->pid,
                 'ppid' => $ppid,
                 'start_time' => $start_time,
@@ -213,6 +216,10 @@ class Phpcron
                 'status' => $this->code_config['process_running']
 
             ));
+
+            // 更新cron表
+            $this->pdo->update('crontab', ['master_pid' => $ppid, 'start_time' => $start_time, 'finish_time' => 0], ['id' => $cron['id']]);
+
 
             $this->process_info[$pid] = array(
                 'id' => $cron['id'],
@@ -270,6 +277,7 @@ class Phpcron
      */
     protected function _register_signal()
     {
+        echo '检测信号开始';
 
         // @todo, 当父进程意外退出之后, 由supervisor重启之后就失效了
 
@@ -285,9 +293,11 @@ class Phpcron
                 $status = !empty($exit_code) ? $this->code_config['process_exception_end'] : $this->code_config['process_normal_end'];
                 echo '子进程结束了';
                 echo PHP_EOL;
-                print_r($ret);
+
+                // 更新process表
                 $this->pdo->update('process', ['exit_code' => $exit_code, 'status' => $status, 'end_time' => $end_time], ['pid' => $ret['pid']]);
-                print_r($this->pdo->last());
+                // 更新cron表
+                $this->pdo->update('crontab', ['finish_time' => $end_time], ['id' => $cron_id]);
                 //$this->clear_process_info($ret['pid']);
                 //$this->clear_timeout_info($ret['pid']);
             }
