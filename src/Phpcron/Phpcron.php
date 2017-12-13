@@ -7,6 +7,7 @@ use Phpcron\Adapter\Utils;
 use Phpcron\Model\Crontab;
 use Phpcron\Model\Model;
 use Phpcron\Adapter\Proc;
+use Phpcron\Adapter\Log\Log;
 
 class Phpcron
 {
@@ -51,6 +52,8 @@ class Phpcron
 
     public function run()
     {
+        Log::info('测试', true, true);
+        exit(2);
        if ($this->_is_run)
        {
            throw new \RuntimeException('Already running');
@@ -63,8 +66,9 @@ class Phpcron
 
        $this->_set_master_pid();
 
-       $this->_exec_cron();
 
+       // 具体执行cron
+       $this->_exec_cron();
        $this->_exec_cron_timer();
 
        $this->_register_signal();
@@ -160,13 +164,22 @@ class Phpcron
         $proc = new Proc();
         $pids = $proc->showPids($cron['exec_file'], $cron['args']);
 
-        if ($this->_get_master_pid() != $cron['master_pid'])
+        if ($this->_get_master_pid() != $cron['master_pid'] && $cron['master_pid'] != 0)
         {
-            //表示入口程序已经重启了, 这地方逻辑需要重新评估
-            if (count($pids) > 0)
-            {
-                // 上一次主进程退了, 但是process进程没有退出的情况
+            $reload_time = date('Y-m-d H:i:s');
+            // 表示入口程序挂了
+            $reload_ret = $this->pdo->insert('daemon_record', array(
+                'server_id' => $cron['server_id'],
+                'type' => 1,
+                'info' => '时间:' . $reload_time . ' ,daemon入口程序重启了',
+                'create_time' => $reload_time
+
+            ));
+
+            if ($reload_ret == false) {
+
             }
+
         }
 
 
@@ -277,8 +290,6 @@ class Phpcron
      */
     protected function _register_signal()
     {
-        echo '检测信号开始';
-
         // @todo, 当父进程意外退出之后, 由supervisor重启之后就失效了
 
         \Swoole\Process::signal(SIGCHLD, function($sig) {
@@ -298,8 +309,12 @@ class Phpcron
                 $this->pdo->update('process', ['exit_code' => $exit_code, 'status' => $status, 'end_time' => $end_time], ['pid' => $ret['pid']]);
                 // 更新cron表
                 $this->pdo->update('crontab', ['finish_time' => $end_time], ['id' => $cron_id]);
-                //$this->clear_process_info($ret['pid']);
-                //$this->clear_timeout_info($ret['pid']);
+
+                // 清除变量进程信息
+                $this->clear_process_info($ret['pid']);
+
+                // 清除超时进程信息
+                $this->clear_timeout_info($ret['pid']);
             }
         });
 
@@ -314,7 +329,18 @@ class Phpcron
      */
     protected function clear_process_info($pid)
     {
+        if (DEBUG) {
+            echo "清除之前的进程变量\n";
+            print_r($this->process_info);
+        }
+
         unset($this->process_info[$pid]);
+
+        if (DEBUG) {
+            echo "清除之后的进程变量\n";
+            print_r($this->process_info);
+        }
+
     }
 
     /**
@@ -323,8 +349,18 @@ class Phpcron
      */
     protected function clear_timeout_info($pid)
     {
+        if (DEBUG) {
+            echo "清除之前的超时变量\n";
+            print_r($this->timeout_info);
+        }
+
         if (isset($this->timeout_info[$pid])) {
             unset($this->timeout_info[$pid]);
+        }
+
+        if (DEBUG) {
+            echo "清除之后的超时变量\n";
+            print_r($this->timeout_info);
         }
     }
 

@@ -27,7 +27,12 @@ return array(
     // 各种次数的配置
     'frequency' => array(
         'exec_retry_count' => 3,
-    )
+    ),
+
+    'log' => array(
+        'path' => '/tmp/page_phpcron',
+        'type' => 'file'
+    ),
 
 );
 

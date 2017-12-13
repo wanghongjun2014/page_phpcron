@@ -280,7 +280,7 @@ class Model
         return $this->exec($query, $map, $is_insert);
     }
 
-    public function exec($query, $map = [])
+    public function exec($query, $map = [], $type = 'select')
     {
         if ($this->debug_mode)
         {
@@ -310,6 +310,9 @@ class Model
             }
 
             $ret = $statement->execute();
+            if (in_array($type, array('insert', 'update'))) {
+                return $ret;
+            }
             $this->statement = $statement;
             // 这个哥们开发的包竟然return $statement 有病啊 擦
             return $statement;
@@ -1173,7 +1176,7 @@ class Model
             $fields[] = $this->columnQuote(preg_replace("/(^#|\s*\[JSON\]$)/i", '', $key));
         }
 
-        return $this->exec('INSERT INTO ' . $this->tableQuote($table) . ' (' . implode(', ', $fields) . ') VALUES ' . implode(', ', $stack), $map);
+        return $this->exec('INSERT INTO ' . $this->tableQuote($table) . ' (' . implode(', ', $fields) . ') VALUES ' . implode(', ', $stack), $map, 'insert');
     }
 
     public function update($table, $data, $where = null)
@@ -1245,7 +1248,7 @@ class Model
             }
         }
 
-        return $this->exec('UPDATE ' . $this->tableQuote($table) . ' SET ' . implode(', ', $fields) . $this->whereClause($where, $map), $map);
+        return $this->exec('UPDATE ' . $this->tableQuote($table) . ' SET ' . implode(', ', $fields) . $this->whereClause($where, $map), $map, 'update');
     }
 
     public function delete($table, $where)
