@@ -7,7 +7,7 @@ use Phpcron\Adapter\Utils;
 use Phpcron\Model\Crontab;
 use Phpcron\Model\Model;
 use Phpcron\Adapter\Proc;
-use Phpcron\Adapter\Log\Log;
+use Phpcron\Adapter\Logger;
 
 class Phpcron
 {
@@ -36,6 +36,8 @@ class Phpcron
 
     protected $timeout_info = array();
 
+    protected $logger;
+
     public function __construct(array $options = array())
     {
         $this->config = $options;
@@ -46,14 +48,13 @@ class Phpcron
         $this->frequency_config = $options['frequency'];
         $pdo = new Pdo($options['db']);
         $this->pdo = $pdo->pdo;
+        $this->logger = new Logger(array('path' => '/tmp/pagecron'));
 
     }
 
 
     public function run()
     {
-        Log::info('测试', true, true);
-        exit(2);
        if ($this->_is_run)
        {
            throw new \RuntimeException('Already running');
@@ -65,7 +66,6 @@ class Phpcron
        Utils::msg('run:', '入口程序开始执行了');
 
        $this->_set_master_pid();
-
 
        // 具体执行cron
        $this->_exec_cron();
@@ -177,7 +177,7 @@ class Phpcron
             ));
 
             if ($reload_ret == false) {
-
+                $this->logger->error('insert daemon_record 返回 false');
             }
 
         }
@@ -230,9 +230,15 @@ class Phpcron
 
             ));
 
+            if ($insert_ret == false) {
+                $this->logger->error('insert process error, cron_id : ' . $cron['id']);
+            }
             // 更新cron表
-            $this->pdo->update('crontab', ['master_pid' => $ppid, 'start_time' => $start_time, 'finish_time' => 0], ['id' => $cron['id']]);
+            $update_ret = $this->pdo->update('crontab', ['master_pid' => $ppid, 'start_time' => $start_time, 'finish_time' => 0], ['id' => $cron['id']]);
 
+            if ($update_ret == false) {
+                $this->logger->error('update crontab error, cron_id : ' . $cron['id']);
+            }
 
             $this->process_info[$pid] = array(
                 'id' => $cron['id'],
@@ -331,7 +337,7 @@ class Phpcron
     {
         if (DEBUG) {
             echo "清除之前的进程变量\n";
-            print_r($this->process_info);
+//            print_r($this->process_info);
         }
 
         unset($this->process_info[$pid]);
