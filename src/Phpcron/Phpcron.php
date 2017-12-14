@@ -67,6 +67,10 @@ class Phpcron
 
        $this->_set_master_pid();
 
+       //@todo1, 定时器检查超时进程杀掉
+       //@todo2, 定时器检查机器存活状态
+
+
        // 具体执行cron
        $this->_exec_cron();
        $this->_exec_cron_timer();
@@ -179,6 +183,8 @@ class Phpcron
             if ($reload_ret == false) {
                 $this->logger->error('insert daemon_record 返回 false');
             }
+
+            // 查询数据库的正在运行的进程状态, 重新赋值给当前主进程的process_info 和 time_info变量
 
         }
 
