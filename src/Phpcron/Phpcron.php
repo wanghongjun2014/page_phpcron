@@ -26,15 +26,24 @@ class Phpcron
 
     protected $code_config = array();
 
+    protected $signal_config = array();
+
     protected $cron_model = null;
 
     protected $model = null;
 
     protected $first_enter = true;  // 这个变量很关键,
 
+    /**    如下变量当进程退出之后需要重新赋值的   **/
+
     protected $process_info = array();
 
     protected $timeout_info = array();
+
+    protected $server_id = '';
+
+
+    /**    end   **/
 
     protected $logger;
 
@@ -45,10 +54,12 @@ class Phpcron
         $this->cron_model = new Crontab();
         $this->timer_config = $options['timer'];
         $this->code_config = $options['code'];
+        $this->signal_config = $options['signal_config'];
         $this->frequency_config = $options['frequency'];
         $pdo = new Pdo($options['db']);
         $this->pdo = $pdo->pdo;
-        $this->logger = new Logger(array('path' => '/tmp/pagecron'));
+        $log_config = isset($options['log']) ? $options['log'] : array('path' => '/tmp/pagecron');
+        $this->logger = new Logger($log_config);
 
     }
 
@@ -104,6 +115,8 @@ class Phpcron
         {
             exit(0);
         }
+        $this->server_id = $current_server['id'];
+
         $current_server_cron = $this->pdo->select('crontab', '*', array('server_id' => $current_server['id']));
 
         if (!empty($current_server_cron))
@@ -185,7 +198,43 @@ class Phpcron
             }
 
             // 查询数据库的正在运行的进程状态, 重新赋值给当前主进程的process_info 和 time_info变量
+            if ($pids) {
+                $last_exit_process = $this->pdo->select('process', '*', array('pid' => $pids));
+                $cron_ids = Utils::filter_by_field($last_exit_process, 'cron_id');
+                $last_exit_cron = $this->pdo->select('crontab', '*', array('id' => $cron_ids));
+                $last_exit_timeout = array();
+                foreach ($last_exit_cron as $exit_cron)
+                {
+                    $last_exit_timeout[$exit_cron['id']] = $exit_cron;
+                }
 
+                if (!empty($last_exit_cron)) {
+                    foreach ($last_exit_process as $exit_process) {
+                        $this->process_info[$exit_process['pid']] = array(
+                            'id' => $exit_process['cron_id'],
+                            'server_id' => $exit_process['server_id'],
+                            'start_time' => $exit_process['start_time']
+                        );
+
+                        if (!empty($last_exit_timeout[$exit_process['cron_id']]['timeout'])) {
+                            $this->timeout_info[$exit_process['pid']] = array(
+                                'id' => $exit_process['cron_id'],
+                                'expire_time' => $last_exit_timeout[$exit_process['cron_id']]['timeout'] * 1000 + $exit_process['start_time'],
+                                'timeout_kill_type' => $last_exit_timeout[$exit_process['cron_id']]['timeout_kill_type']
+                            );
+                        }
+                    }
+                }
+
+            } else {
+                // 如果该cron对应的进程在第二次到时间运行之前全部结束的话
+                $exception_time = Utils::get_milli_second();
+                $update_ret = $this->pdo->update('process', ['end_time' => $exception_time, 'status' => $this->code_config['process_exception_end'], 'code' => $this->signal_config['exit_signal_101']], ['AND' => ['id' => $cron['id'], 'status' => $this->code_config['process_running']]]);
+
+                if ($update_ret == false) {
+                    $this->logger->error('update crontab error, cron_id : ' . $cron['id']);
+                }
+            }
         }
 
 
@@ -250,8 +299,7 @@ class Phpcron
                 'id' => $cron['id'],
                 'name' => $cron['name'],
                 'server_id' => $cron['server_id'],
-                'start_time' => $start_time,
-                'process' => $process
+                'start_time' => $start_time
             );
 
             if (!empty($cron['timeout']))
@@ -320,7 +368,7 @@ class Phpcron
                 // 更新process表
                 $this->pdo->update('process', ['exit_code' => $exit_code, 'status' => $status, 'end_time' => $end_time], ['pid' => $ret['pid']]);
                 // 更新cron表
-                $this->pdo->update('crontab', ['finish_time' => $end_time], ['id' => $cron_id]);
+                $this->pdo->update('crontab', ['finish_time' => $end_time, 'exit_code' => $exit_code], ['id' => $cron_id]);
 
                 // 清除变量进程信息
                 $this->clear_process_info($ret['pid']);
@@ -331,8 +379,8 @@ class Phpcron
         });
 
         // 这两个是检测主进程信号的, 不是子进程
-        \Swoole\Process::signal(SIGINT, [__CLASS__, 'register_die']);
-        \Swoole\Process::signal(SIGTERM, [__CLASS__, 'register_die']);
+        \Swoole\Process::signal(SIGINT, [$this, 'register_die']);
+        \Swoole\Process::signal(SIGTERM, [$this, 'register_die']);
     }
 
     /**
@@ -381,10 +429,23 @@ class Phpcron
      * 注册死亡信号
      * @param $signal
      */
-    public static function register_die($signal)
+    public function register_die($signal)
     {
-        Utils::msg('入口程序退出了', '信号为' . $signal, 'error');
+        $date_time = date('Y-m-d H:i:s');
+        // 表示入口程序挂了
+        $ret = $this->pdo->insert('daemon_record', array(
+            'server_id' => $this->server_id,
+            'type' => 1,
+            'info' => '时间:' . $date_time . ' ,daemon入口程序退出了, 信号为' . $signal,
+            'create_time' => $date_time
 
+        ));
+
+        if ($ret == false) {
+            $this->logger->error('insert signal exit daemon_record 返回 false');
+        }
+
+        Utils::msg('入口程序退出了', '信号为' . $signal, 'error');
         // 入口主进程程序挂了, 逻辑处理部分
         exit(0);
     }

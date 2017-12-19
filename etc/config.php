@@ -15,8 +15,12 @@ return array(
     // 各种状态码的配置
     'code' => array(
         'process_running' => 1,
-        'process_normal_end' => 2,
-        'process_exception_end' => 3
+        'process_normal_end' => 2, // 正常由主(父)进程回收的结束子进程
+        'process_exception_end' => 3 // 主进程异常退出后, 重启的主进程检测该进程已经不执行的情况下
+    ),
+
+    'exit_signal' => array(
+        'exit_signal_101' => 101,   // 哥们实在想不出该叫啥了, 先用数字表示吧, 脑仁疼
     ),
 
     // 各种时间间隔的配置
