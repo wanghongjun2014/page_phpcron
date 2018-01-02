@@ -19,7 +19,7 @@ return array(
         'process_exception_end' => 3 // 主进程异常退出后, 重启的主进程检测该进程已经不执行的情况下
     ),
 
-    'exit_signal' => array(
+    'signal_config' => array(
         'exit_signal_101' => 101,   // 哥们实在想不出该叫啥了, 先用数字表示吧, 脑仁疼
     ),
 

@@ -50,7 +50,6 @@ class Phpcron
     public function __construct(array $options = array())
     {
         $this->config = $options;
-        $this->model = new Model();
         $this->cron_model = new Crontab();
         $this->timer_config = $options['timer'];
         $this->code_config = $options['code'];
@@ -70,8 +69,6 @@ class Phpcron
        {
            throw new \RuntimeException('Already running');
        }
-
-
        $this->_is_run = true;
 
        Utils::msg('run:', '入口程序开始执行了');
@@ -82,10 +79,9 @@ class Phpcron
        //@todo2, 定时器检查机器存活状态
 
 
-       // 具体执行cron
-       $this->_exec_cron();
-       $this->_exec_cron_timer();
 
+       $this->_exec_cron_timer();
+       $this->_exec_cron();
        $this->_register_signal();
     }
 
@@ -208,15 +204,18 @@ class Phpcron
                     $last_exit_timeout[$exit_cron['id']] = $exit_cron;
                 }
 
-                if (!empty($last_exit_cron)) {
-                    foreach ($last_exit_process as $exit_process) {
+                if (!empty($last_exit_cron))
+                {
+                    foreach ($last_exit_process as $exit_process)
+                    {
                         $this->process_info[$exit_process['pid']] = array(
                             'id' => $exit_process['cron_id'],
                             'server_id' => $exit_process['server_id'],
                             'start_time' => $exit_process['start_time']
                         );
 
-                        if (!empty($last_exit_timeout[$exit_process['cron_id']]['timeout'])) {
+                        if (!empty($last_exit_timeout[$exit_process['cron_id']]['timeout']))
+                        {
                             $this->timeout_info[$exit_process['pid']] = array(
                                 'id' => $exit_process['cron_id'],
                                 'expire_time' => $last_exit_timeout[$exit_process['cron_id']]['timeout'] * 1000 + $exit_process['start_time'],
@@ -368,7 +367,7 @@ class Phpcron
                 // 更新process表
                 $this->pdo->update('process', ['exit_code' => $exit_code, 'status' => $status, 'end_time' => $end_time], ['pid' => $ret['pid']]);
                 // 更新cron表
-                $this->pdo->update('crontab', ['finish_time' => $end_time, 'exit_code' => $exit_code], ['id' => $cron_id]);
+                    $this->pdo->update('crontab', ['finish_time' => $end_time, 'exit_code' => $exit_code], ['id' => $cron_id]);
 
                 // 清除变量进程信息
                 $this->clear_process_info($ret['pid']);

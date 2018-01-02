@@ -3,14 +3,14 @@
 namespace Phpcron\Model;
 use Phpcron\Model\Model As Base_Model;
 
-class Crontab extends Base_Model
+class Crontab
 {
 
     protected $table = 'page_crontab';
 
     public function __construct()
     {
-        parent::__construct();
+
     }
 
 

@@ -17,7 +17,8 @@ class Pdo
 
     protected function connect()
     {
-        $pdo = new Model([
+
+        $param = array(
             'database_type' => $this->options['engine'],
             'database_name' => $this->options['database'],
             'server' => $this->options['host'],
@@ -34,7 +35,8 @@ class Pdo
             // [optional] Enable logging (Logging is disabled by default for better performance)
             'logging' => true,
 
-        ]);
+        );
+        $pdo = new Model($param);
 
         $this->pdo = $pdo;
     }
